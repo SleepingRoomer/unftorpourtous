@@ -6,4 +6,4 @@ La carte collaborative des iftars : une carte pour trouver un iftar pendant le R
 
 Site : https://sleepingroomer.github.io/unftorpourtous/
 
-Carte : Leaflet et fonds de carte OpenStreetMap / CARTO.
+Carte : Leaflet et fonds de carte OpenStreetMap / CARTO. Identité proche d'Al Maydan : vert, papier chaud, Cormorant Garamond, Spectral et Amiri ; ciel du maghrib et horizon de coupoles.

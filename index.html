@@ -7,117 +7,134 @@
 <meta name="description" content="Maquette : une carte collaborative pour trouver un iftar pendant le Ramadan, ou en proposer un.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lalezar&family=Karla:ital,wght@0,400;0,500;0,700;1,400&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Spectral:ital,wght@0,400;0,500;0,600;1,400&family=Amiri:wght@400;700&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
-/* Mise en page : un ciel de crépuscule en tête (l'heure du ftor), puis la liste des iftars à gauche et la carte à droite.
-   Abricot = action, or = repères, vert = places libres. */
+/* Un Ftor pour tous, dans l'univers d'Al Maydan : papier chaud, vert #247818, rouge réservé à l'arabe et à l'urgence,
+   Cormorant Garamond et Spectral. Ce qui lui est propre : le ciel du maghrib en vert de nuit et or, et l'horizon de coupoles.
+   Mise en page : le ciel et l'heure du ftor en tête, puis la liste des iftars à gauche et la carte à droite. */
 :root{
-  --bg:#f5f5fa; --surface:#ffffff; --ink:#1c1a33; --muted:#5f5d78; --line:#e2e1ec; --soft:#ecebf5;
-  --night:#1f1c45; --dusk:#b4486c; --apricot:#f08a4b; --gold:#f5c04f; --ok:#24845a; --full:#b23a48;
-  --on-apricot:#2a1204;
-  --display:"Lalezar","Arial Rounded MT Bold",system-ui,sans-serif;
-  --body:"Karla","Segoe UI",system-ui,-apple-system,sans-serif;
+  --paper:#fbfaf5; --paper-2:#f3efe4; --card:#ffffff; --ink:#1c1b16; --ink-soft:#4b4940; --muted:#837e6e;
+  --line:#e6e1d4; --line-2:#d6d0bf;
+  --green:#247818; --green-d:#1a5810; --green-t:#edf3ea; --red:#e40000; --gold:#d9a441; --gold-t:#f6e9c9;
+  --night:#0f2a0c;
+  --display:"Cormorant Garamond",Georgia,"Times New Roman",serif;
+  --body:"Spectral",Georgia,serif;
+  --arabic:"Amiri","Noto Naskh Arabic",serif;
   color-scheme:light;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --bg:#12111f; --surface:#1b1a2c; --ink:#ecebf6; --muted:#a8a6c2; --line:#2d2b44; --soft:#24233a;
-  --ok:#5fcf98; --full:#ff7f8c; color-scheme:dark}}
+  --paper:#12150f; --paper-2:#1a1e16; --card:#191d15; --ink:#efece2; --ink-soft:#cfcab9; --muted:#a29d8b;
+  --line:#2c3126; --line-2:#3a4032; --green:#5cb84a; --green-d:#7fcf6d; --green-t:#1d2a19; --red:#ff6b5e; --gold-t:#3a2f17;
+  color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#12111f; --surface:#1b1a2c; --ink:#ecebf6; --muted:#a8a6c2; --line:#2d2b44; --soft:#24233a;
-  --ok:#5fcf98; --full:#ff7f8c; color-scheme:dark}
+  --paper:#12150f; --paper-2:#1a1e16; --card:#191d15; --ink:#efece2; --ink-soft:#cfcab9; --muted:#a29d8b;
+  --line:#2c3126; --line-2:#3a4032; --green:#5cb84a; --green-d:#7fcf6d; --green-t:#1d2a19; --red:#ff6b5e; --gold-t:#3a2f17;
+  color-scheme:dark}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.55}
 .wrap{max-width:1240px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-h1,h2,h3{font-family:var(--display);font-weight:400;line-height:1.05;margin:0;letter-spacing:.005em}
+h1,h2,h3{font-family:var(--display);font-weight:600;line-height:1.02;margin:0;letter-spacing:-.01em}
 p{margin:0}
+[lang="ar"]{font-family:var(--arabic);letter-spacing:0}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
-:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
 
-.proto{background:var(--gold);color:#2a1d00;text-align:center;font-size:.86rem;font-weight:700;padding:6px 16px;padding-top:calc(6px + env(safe-area-inset-top,0px))}
+.proto{background:var(--gold-t);color:var(--ink);text-align:center;font-size:.85rem;padding:6px 16px;padding-top:calc(6px + env(safe-area-inset-top,0px));border-bottom:1px solid var(--line)}
+.proto b{color:var(--red);font-weight:600}
 
-/* Ciel */
-.sky{position:relative;overflow:hidden;color:#fff;background:linear-gradient(180deg,#1f1c45 0%,#43306a 38%,#b4486c 72%,#f08a4b 100%)}
-.sky .wrap{position:relative;display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:28px;align-items:end;padding-block:44px 34px}
-.stars{position:absolute;inset:0 0 45% 0;background-image:radial-gradient(1.4px 1.4px at 12% 22%,#fff 50%,transparent 51%),radial-gradient(1.2px 1.2px at 28% 64%,#fff 50%,transparent 51%),radial-gradient(1.6px 1.6px at 47% 18%,#fff 50%,transparent 51%),radial-gradient(1.2px 1.2px at 63% 40%,#fff 50%,transparent 51%),radial-gradient(1.4px 1.4px at 81% 15%,#fff 50%,transparent 51%),radial-gradient(1.1px 1.1px at 92% 52%,#fff 50%,transparent 51%);opacity:.8}
-.moon{position:absolute;right:7%;top:26px;width:70px;height:70px;border-radius:50%;box-shadow:-14px 8px 0 0 var(--gold);transform:rotate(-20deg);opacity:.95}
-.sun{position:absolute;left:50%;bottom:-70px;width:180px;height:180px;margin-left:-90px;border-radius:50%;background:radial-gradient(circle,#ffd27a 0%,#f8a55a 55%,transparent 72%);opacity:.75}
-.sky h1{font-size:clamp(2.8rem,8vw,5.2rem)}
-.sky h1 span{display:block;font-size:.42em;color:var(--gold);margin-bottom:.1em}
-.sky .lede{margin-top:14px;font-size:1.15rem;max-width:44ch;opacity:.95}
-.clock{justify-self:end;background:rgba(20,16,50,.45);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.25);border-radius:18px;padding:18px 20px;min-width:min(300px,100%);display:grid;gap:4px}
-.clock small{font-size:.82rem;opacity:.85}
-.clock b{font-family:var(--display);font-weight:400;font-size:2.6rem;line-height:1;color:var(--gold)}
-.clock span{font-size:.95rem}
+/* Ciel du maghrib */
+.sky{position:relative;overflow:hidden;color:#fff;background:linear-gradient(180deg,#0b2208 0%,#14400f 34%,#2f6a22 60%,#a7a35a 82%,#e9c27a 100%)}
+.sky .wrap{position:relative;display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:28px;align-items:end;padding-block:30px 96px}
+.signature{display:flex;align-items:center;gap:10px;font-size:.78rem;letter-spacing:.2em;text-transform:uppercase;color:#cfe3c8;margin-bottom:26px}
+.signature svg{width:16px;height:20px}
+.stars{position:absolute;inset:0 0 55% 0;background-image:radial-gradient(1.3px 1.3px at 12% 22%,#fff 50%,transparent 51%),radial-gradient(1.1px 1.1px at 28% 54%,#fff 50%,transparent 51%),radial-gradient(1.5px 1.5px at 47% 16%,#fff 50%,transparent 51%),radial-gradient(1.1px 1.1px at 63% 38%,#fff 50%,transparent 51%),radial-gradient(1.3px 1.3px at 81% 13%,#fff 50%,transparent 51%),radial-gradient(1px 1px at 92% 48%,#fff 50%,transparent 51%);opacity:.75}
+.moon{position:absolute;right:8%;top:30px;width:64px;height:64px;border-radius:50%;box-shadow:-13px 7px 0 0 var(--gold);transform:rotate(-20deg)}
+.sun{position:absolute;left:62%;bottom:-60px;width:170px;height:170px;border-radius:50%;background:radial-gradient(circle,#ffe2a0 0%,#f2c46e 50%,transparent 72%);opacity:.85}
+.horizon{position:absolute;left:0;right:0;bottom:0;height:70px;color:#0b2208;pointer-events:none}
+.horizon svg{width:100%;height:100%;display:block}
+.sky h1{font-size:clamp(3rem,8vw,5.6rem);font-weight:600}
+.sky h1 em{font-style:italic;color:#f2d79a;font-weight:500}
+.sky h1 span{display:block;font-size:.5em;color:#ffb3a8;margin-bottom:.15em;font-weight:700}
+.sky .lede{margin-top:16px;font-size:1.12rem;max-width:44ch;color:#eef4ea}
+.clock{justify-self:end;background:rgba(251,250,245,.1);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.3);border-radius:3px;padding:18px 22px;min-width:min(300px,100%);display:grid;gap:2px}
+.clock small{font-size:.75rem;letter-spacing:.18em;text-transform:uppercase;color:#cfe3c8}
+.clock b{font-family:var(--display);font-weight:600;font-size:3.4rem;line-height:1;color:#f2d79a}
+.clock span{font-size:.95rem;color:#eef4ea}
 
 /* Barre d'outils */
-.tools{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;padding-block:18px}
-.where{display:flex;align-items:center;gap:8px;background:var(--surface);border:1.5px solid var(--line);border-radius:999px;padding:4px 6px 4px 14px;flex:0 1 320px;min-width:0}
+.tools{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:center;justify-content:space-between;padding-block:22px;border-bottom:1px solid var(--line)}
+.where{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line-2);border-radius:100px;padding:4px 5px 4px 16px;flex:0 1 320px;min-width:0}
 .where input{border:0;background:none;padding:8px 0;min-width:0;width:100%;outline:none}
-.where button{border:0;background:var(--night);color:#fff;border-radius:999px;padding:8px 14px;font-weight:700;white-space:nowrap}
+.where button{border:0;background:var(--ink);color:var(--paper);border-radius:100px;padding:8px 16px;font-size:.92rem;white-space:nowrap}
 .filters{display:flex;flex-wrap:wrap;gap:8px}
-.f{border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 13px;font-weight:500;font-size:.92rem}
-.f[aria-pressed="true"]{background:var(--night);border-color:var(--night);color:#fff}
-.add{border:0;background:var(--apricot);color:var(--on-apricot);border-radius:999px;padding:11px 18px;font-weight:700;display:inline-flex;align-items:center;gap:8px;box-shadow:0 6px 16px -8px rgba(240,138,75,.9)}
-.add b{font-size:1.2rem;line-height:1}
+.f{border:1px solid var(--line-2);background:transparent;border-radius:100px;padding:6px 14px;font-size:.92rem;color:var(--ink-soft)}
+.f:hover{border-color:var(--ink)}
+.f[aria-pressed="true"]{background:var(--green);border-color:var(--green);color:#fff}
+.add{border:0;background:var(--green);color:#fff;border-radius:3px;padding:12px 20px;font-size:.98rem;font-weight:500;display:inline-flex;align-items:center;gap:8px}
+.add:hover{background:var(--green-d)}
+.add b{font-size:1.2rem;line-height:1;font-weight:400}
 
 /* Liste + carte */
-.main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:18px;padding-bottom:48px;align-items:start}
+.main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:28px;padding-block:24px 56px;align-items:start}
 .view{display:none;gap:6px;margin-bottom:12px}
-.view button{flex:1;border:1.5px solid var(--line);background:var(--surface);border-radius:10px;padding:9px;font-weight:700}
-.view button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
-.count{font-size:.9rem;color:var(--muted);margin-bottom:10px}
-.list{display:grid;gap:12px}
-.card{background:var(--surface);border:1.5px solid var(--line);border-radius:16px;padding:16px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 14px;transition:border-color .15s,transform .15s}
-.card.on{border-color:var(--apricot);transform:translateX(3px)}
-.time{grid-row:1 / span 4;display:grid;place-content:center;text-align:center;width:66px;height:66px;border-radius:14px;background:var(--soft)}
-.time b{font-family:var(--display);font-weight:400;font-size:1.35rem;line-height:1}
-.time small{font-size:.7rem;color:var(--muted)}
-.card h3{font-size:1.4rem}
-.who{color:var(--muted);font-size:.92rem}
-.tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
-.tag{font-size:.78rem;background:var(--soft);border-radius:6px;padding:2px 8px}
-.ex{font-size:.7rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dusk);margin-left:6px;vertical-align:middle;font-family:var(--body)}
-.seats{grid-column:2;display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap}
-.bar{flex:1 1 120px;height:8px;border-radius:8px;background:var(--soft);overflow:hidden}
-.bar i{display:block;height:100%;background:var(--ok);border-radius:8px}
-.seats small{font-size:.85rem;color:var(--ok);font-weight:700;white-space:nowrap}
-.seats small.full{color:var(--full)}
-.go{border:1.5px solid var(--ink);background:transparent;border-radius:999px;padding:6px 14px;font-weight:700;font-size:.88rem}
-.go[aria-pressed="true"]{background:var(--ok);border-color:var(--ok);color:#fff}
-.go:disabled{opacity:.45;cursor:default}
-.mapbox{position:sticky;top:12px;height:calc(100vh - 24px);min-height:420px;max-height:760px;border-radius:18px;overflow:hidden;border:1.5px solid var(--line);background:var(--soft)}
+.view button{flex:1;border:1px solid var(--line-2);background:transparent;border-radius:3px;padding:9px}
+.view button[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.count{font-family:var(--display);font-size:1.5rem;font-weight:600;margin-bottom:12px}
+.list{display:grid;border-top:1px solid var(--line)}
+.card{border-bottom:1px solid var(--line);padding:18px 6px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 18px;transition:background .15s;cursor:pointer}
+.card:hover{background:var(--card)}
+.card.on{background:var(--green-t)}
+.time{grid-row:1 / span 4;display:grid;align-content:start;text-align:center;width:64px;padding-top:2px}
+.time b{font-family:var(--display);font-weight:600;font-size:1.7rem;line-height:1;color:var(--green)}
+.time small{font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-top:4px}
+.card h3{font-size:1.55rem}
+.who{color:var(--muted);font-size:.93rem;font-style:italic}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.tag{font-size:.8rem;border:1px solid var(--line-2);border-radius:100px;padding:1px 10px;color:var(--ink-soft)}
+.ex{font-family:var(--body);font-size:.66rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-left:8px;vertical-align:middle;border:1px dashed var(--line-2);border-radius:2px;padding:1px 6px}
+.seats{grid-column:2;display:flex;align-items:center;gap:12px;margin-top:10px;flex-wrap:wrap}
+.bar{flex:1 1 120px;height:4px;border-radius:4px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--green)}
+.seats small{font-size:.86rem;color:var(--green);white-space:nowrap}
+.seats small.full{color:var(--red)}
+.go{border:1px solid var(--ink);background:transparent;border-radius:3px;padding:6px 14px;font-size:.88rem}
+.go:hover{background:var(--ink);color:var(--paper)}
+.go[aria-pressed="true"]{background:var(--green);border-color:var(--green);color:#fff}
+.go:disabled{opacity:.4;cursor:default;background:transparent;color:inherit}
+.mapbox{position:sticky;top:16px;height:calc(100vh - 32px);min-height:420px;max-height:760px;border-radius:3px;overflow:hidden;border:1px solid var(--line-2);background:var(--paper-2)}
 #map{width:100%;height:100%}
-.nomap{display:grid;place-content:center;height:100%;padding:24px;text-align:center;color:var(--muted)}
-.pin{width:34px;height:34px;border-radius:50% 50% 50% 4px;transform:rotate(-45deg);background:var(--apricot);border:3px solid #fff;box-shadow:0 4px 10px rgba(0,0,0,.3);display:grid;place-items:center}
-.pin i{transform:rotate(45deg);width:12px;height:12px;border-radius:50%;box-shadow:-3px 2px 0 0 #fff}
-.pin.full{background:#9a98b0}
-.pin.on{background:var(--night)}
+.nomap{display:grid;place-content:center;height:100%;padding:24px;text-align:center;color:var(--muted);font-style:italic}
+.pin{width:30px;height:30px;border-radius:50% 50% 50% 3px;transform:rotate(-45deg);background:var(--green);border:2.5px solid #fff;box-shadow:0 4px 10px rgba(0,0,0,.28);display:grid;place-items:center}
+.pin i{transform:rotate(45deg);width:11px;height:11px;border-radius:50%;box-shadow:-3px 2px 0 0 #fff}
+.pin.full{background:#9b9686}
+.pin.on{background:var(--red)}
 .leaflet-container{font-family:var(--body)}
 
 /* Proposer */
-dialog{border:0;padding:0;width:min(560px,calc(100% - 24px));max-height:90vh;border-radius:20px;background:var(--surface);color:var(--ink);box-shadow:0 30px 80px rgba(10,8,30,.45)}
-dialog::backdrop{background:rgba(15,12,40,.55)}
-.d-top{background:linear-gradient(120deg,#43306a,#b4486c 60%,#f08a4b);color:#fff;padding:20px 22px;display:flex;justify-content:space-between;align-items:start;gap:12px}
-.d-top h2{font-size:2rem}
-.d-top p{opacity:.9;font-size:.95rem;margin-top:4px}
-.x{border:0;background:rgba(255,255,255,.2);color:#fff;border-radius:50%;width:36px;height:36px;font-size:1.2rem;line-height:1;flex:none}
-form{padding:20px 22px 22px;display:grid;gap:14px}
-.field{display:grid;gap:5px}
-.field label{font-weight:700;font-size:.92rem}
-.field input,.field select,.field textarea{width:100%;background:var(--bg);border:1.5px solid var(--line);border-radius:10px;padding:10px 12px}
-.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.checks{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:.95rem}
+dialog{border:0;padding:0;width:min(580px,calc(100% - 24px));max-height:90vh;border-radius:3px;background:var(--paper);color:var(--ink);box-shadow:0 30px 80px rgba(10,20,8,.45)}
+dialog::backdrop{background:rgba(11,34,8,.55)}
+.d-top{background:linear-gradient(170deg,#0b2208,#2f6a22 70%,#a7a35a);color:#fff;padding:22px 24px;display:flex;justify-content:space-between;align-items:start;gap:12px}
+.d-top h2{font-size:2.2rem}
+.d-top p{color:#e3eedf;font-size:.95rem;margin-top:6px}
+.x{border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff;border-radius:50%;width:36px;height:36px;font-size:1.2rem;line-height:1;flex:none}
+form{padding:22px 24px 24px;display:grid;gap:16px}
+.field{display:grid;gap:6px}
+.field label{font-weight:600;font-size:.92rem}
+.field input,.field select,.field textarea{width:100%;background:var(--card);border:1px solid var(--line-2);border-radius:3px;padding:10px 12px}
+.field input:focus,.field select:focus{outline:none;border-color:var(--green)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.checks{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:.95rem}
 .checks label{display:inline-flex;gap:6px;align-items:center;font-weight:400}
-.checks input{width:auto;padding:0;accent-color:var(--apricot)}
-.note{font-size:.85rem;color:var(--muted)}
-.ok{display:grid;gap:10px;padding:26px 22px;text-align:center;justify-items:center}
-.ok h3{font-size:1.8rem}
+.checks input{width:auto;padding:0;accent-color:var(--green)}
+.note{font-size:.85rem;color:var(--muted);font-style:italic}
+.ok{display:grid;gap:12px;padding:30px 24px;text-align:center;justify-items:center}
+.ok h3{font-size:2.2rem}
 
 @media (max-width:900px){
-  .sky .wrap{grid-template-columns:minmax(0,1fr)}
+  .sky .wrap{grid-template-columns:minmax(0,1fr);padding-bottom:84px}
   .clock{justify-self:start}
   .main{grid-template-columns:minmax(0,1fr)}
   .view{display:flex}
@@ -125,21 +142,25 @@ form{padding:20px 22px 22px;display:grid;gap:14px}
   .main[data-view="carte"] .list,.main[data-view="carte"] .count{display:none}
   .mapbox{position:relative;top:0;height:70vh}
 }
-@media (max-width:520px){.two{grid-template-columns:minmax(0,1fr)}.moon{width:48px;height:48px;right:20px}}
+@media (max-width:520px){.two{grid-template-columns:minmax(0,1fr)}.moon{width:46px;height:46px;right:20px}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
-<div class="proto">Maquette : les iftars affichés sont des exemples fictifs.</div>
+<div class="proto"><b>Maquette</b> · les iftars affichés sont des exemples fictifs.</div>
 
 <header class="sky">
   <div class="stars" aria-hidden="true"></div>
   <div class="moon" aria-hidden="true"></div>
   <div class="sun" aria-hidden="true"></div>
+  <div class="horizon" aria-hidden="true">
+    <svg viewBox="0 0 1200 70" preserveAspectRatio="none"><path fill="currentColor" d="M0 70V52h70V38c0-14 10-22 22-24 12 2 22 10 22 24v14h40V44h30v8h120V30c0-18 14-30 30-32 16 2 30 14 30 32v22h60V46h18V20h6v26h18v6h150V40c0-12 9-20 20-22 11 2 20 10 20 22v12h90V34c0-16 12-27 26-29 14 2 26 13 26 29v18h70V44h24V14h6v30h24v8h166V36c0-12 9-20 20-22 11 2 20 10 20 22v34z"/></svg>
+  </div>
   <div class="wrap">
     <div>
-      <h1><span lang="ar">فطور للجميع</span>Un Ftor pour tous</h1>
-      <p class="lede">Trouvez un iftar près de chez vous pendant le Ramadan, ou proposez le vôtre. Repas partagés, distributions et tables ouvertes, signalés par celles et ceux qui les organisent.</p>
+      <div class="signature"><svg viewBox="40 0 160 280" aria-hidden="true"><g fill="currentColor"><path d="M78,98 L78,70 C78,38 96,24 120,24 C144,24 162,38 162,70 L162,98 Z"/><circle cx="120" cy="9" r="5.5"/><rect x="116" y="11" width="8" height="14"/><rect x="48" y="104" width="42" height="46"/><rect x="96" y="98" width="48" height="52"/><rect x="150" y="104" width="42" height="46"/><rect x="96" y="150" width="48" height="120"/></g></svg><span>Une initiative d'Al Maydan</span></div>
+      <h1><span lang="ar">فطور للجميع</span>Un Ftor <em>pour tous</em></h1>
+      <p class="lede">Trouvez un iftar près de chez vous pendant le Ramadan, ou proposez le vôtre : repas partagés, distributions et tables ouvertes, signalés par celles et ceux qui les organisent.</p>
     </div>
     <div class="clock" aria-live="polite">
       <small id="clock-where">Aujourd'hui à Paris</small>
