@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Un Ftor pour tous</title>
+<meta name="description" content="Maquette : une carte collaborative pour trouver un iftar pendant le Ramadan, ou en proposer un.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lalezar&family=Karla:ital,wght@0,400;0,500;0,700;1,400&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+/* Mise en page : un ciel de crépuscule en tête (l'heure du ftor), puis la liste des iftars à gauche et la carte à droite.
+   Abricot = action, or = repères, vert = places libres. */
+:root{
+  --bg:#f5f5fa; --surface:#ffffff; --ink:#1c1a33; --muted:#5f5d78; --line:#e2e1ec; --soft:#ecebf5;
+  --night:#1f1c45; --dusk:#b4486c; --apricot:#f08a4b; --gold:#f5c04f; --ok:#24845a; --full:#b23a48;
+  --on-apricot:#2a1204;
+  --display:"Lalezar","Arial Rounded MT Bold",system-ui,sans-serif;
+  --body:"Karla","Segoe UI",system-ui,-apple-system,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#12111f; --surface:#1b1a2c; --ink:#ecebf6; --muted:#a8a6c2; --line:#2d2b44; --soft:#24233a;
+  --ok:#5fcf98; --full:#ff7f8c; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12111f; --surface:#1b1a2c; --ink:#ecebf6; --muted:#a8a6c2; --line:#2d2b44; --soft:#24233a;
+  --ok:#5fcf98; --full:#ff7f8c; color-scheme:dark}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5}
+.wrap{max-width:1240px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{font-family:var(--display);font-weight:400;line-height:1.05;margin:0;letter-spacing:.005em}
+p{margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+
+.proto{background:var(--gold);color:#2a1d00;text-align:center;font-size:.86rem;font-weight:700;padding:6px 16px;padding-top:calc(6px + env(safe-area-inset-top,0px))}
+
+/* Ciel */
+.sky{position:relative;overflow:hidden;color:#fff;background:linear-gradient(180deg,#1f1c45 0%,#43306a 38%,#b4486c 72%,#f08a4b 100%)}
+.sky .wrap{position:relative;display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:28px;align-items:end;padding-block:44px 34px}
+.stars{position:absolute;inset:0 0 45% 0;background-image:radial-gradient(1.4px 1.4px at 12% 22%,#fff 50%,transparent 51%),radial-gradient(1.2px 1.2px at 28% 64%,#fff 50%,transparent 51%),radial-gradient(1.6px 1.6px at 47% 18%,#fff 50%,transparent 51%),radial-gradient(1.2px 1.2px at 63% 40%,#fff 50%,transparent 51%),radial-gradient(1.4px 1.4px at 81% 15%,#fff 50%,transparent 51%),radial-gradient(1.1px 1.1px at 92% 52%,#fff 50%,transparent 51%);opacity:.8}
+.moon{position:absolute;right:7%;top:26px;width:70px;height:70px;border-radius:50%;box-shadow:-14px 8px 0 0 var(--gold);transform:rotate(-20deg);opacity:.95}
+.sun{position:absolute;left:50%;bottom:-70px;width:180px;height:180px;margin-left:-90px;border-radius:50%;background:radial-gradient(circle,#ffd27a 0%,#f8a55a 55%,transparent 72%);opacity:.75}
+.sky h1{font-size:clamp(2.8rem,8vw,5.2rem)}
+.sky h1 span{display:block;font-size:.42em;color:var(--gold);margin-bottom:.1em}
+.sky .lede{margin-top:14px;font-size:1.15rem;max-width:44ch;opacity:.95}
+.clock{justify-self:end;background:rgba(20,16,50,.45);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.25);border-radius:18px;padding:18px 20px;min-width:min(300px,100%);display:grid;gap:4px}
+.clock small{font-size:.82rem;opacity:.85}
+.clock b{font-family:var(--display);font-weight:400;font-size:2.6rem;line-height:1;color:var(--gold)}
+.clock span{font-size:.95rem}
+
+/* Barre d'outils */
+.tools{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;padding-block:18px}
+.where{display:flex;align-items:center;gap:8px;background:var(--surface);border:1.5px solid var(--line);border-radius:999px;padding:4px 6px 4px 14px;flex:0 1 320px;min-width:0}
+.where input{border:0;background:none;padding:8px 0;min-width:0;width:100%;outline:none}
+.where button{border:0;background:var(--night);color:#fff;border-radius:999px;padding:8px 14px;font-weight:700;white-space:nowrap}
+.filters{display:flex;flex-wrap:wrap;gap:8px}
+.f{border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 13px;font-weight:500;font-size:.92rem}
+.f[aria-pressed="true"]{background:var(--night);border-color:var(--night);color:#fff}
+.add{border:0;background:var(--apricot);color:var(--on-apricot);border-radius:999px;padding:11px 18px;font-weight:700;display:inline-flex;align-items:center;gap:8px;box-shadow:0 6px 16px -8px rgba(240,138,75,.9)}
+.add b{font-size:1.2rem;line-height:1}
+
+/* Liste + carte */
+.main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:18px;padding-bottom:48px;align-items:start}
+.view{display:none;gap:6px;margin-bottom:12px}
+.view button{flex:1;border:1.5px solid var(--line);background:var(--surface);border-radius:10px;padding:9px;font-weight:700}
+.view button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.count{font-size:.9rem;color:var(--muted);margin-bottom:10px}
+.list{display:grid;gap:12px}
+.card{background:var(--surface);border:1.5px solid var(--line);border-radius:16px;padding:16px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 14px;transition:border-color .15s,transform .15s}
+.card.on{border-color:var(--apricot);transform:translateX(3px)}
+.time{grid-row:1 / span 4;display:grid;place-content:center;text-align:center;width:66px;height:66px;border-radius:14px;background:var(--soft)}
+.time b{font-family:var(--display);font-weight:400;font-size:1.35rem;line-height:1}
+.time small{font-size:.7rem;color:var(--muted)}
+.card h3{font-size:1.4rem}
+.who{color:var(--muted);font-size:.92rem}
+.tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
+.tag{font-size:.78rem;background:var(--soft);border-radius:6px;padding:2px 8px}
+.ex{font-size:.7rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dusk);margin-left:6px;vertical-align:middle;font-family:var(--body)}
+.seats{grid-column:2;display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap}
+.bar{flex:1 1 120px;height:8px;border-radius:8px;background:var(--soft);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--ok);border-radius:8px}
+.seats small{font-size:.85rem;color:var(--ok);font-weight:700;white-space:nowrap}
+.seats small.full{color:var(--full)}
+.go{border:1.5px solid var(--ink);background:transparent;border-radius:999px;padding:6px 14px;font-weight:700;font-size:.88rem}
+.go[aria-pressed="true"]{background:var(--ok);border-color:var(--ok);color:#fff}
+.go:disabled{opacity:.45;cursor:default}
+.mapbox{position:sticky;top:12px;height:calc(100vh - 24px);min-height:420px;max-height:760px;border-radius:18px;overflow:hidden;border:1.5px solid var(--line);background:var(--soft)}
+#map{width:100%;height:100%}
+.nomap{display:grid;place-content:center;height:100%;padding:24px;text-align:center;color:var(--muted)}
+.pin{width:34px;height:34px;border-radius:50% 50% 50% 4px;transform:rotate(-45deg);background:var(--apricot);border:3px solid #fff;box-shadow:0 4px 10px rgba(0,0,0,.3);display:grid;place-items:center}
+.pin i{transform:rotate(45deg);width:12px;height:12px;border-radius:50%;box-shadow:-3px 2px 0 0 #fff}
+.pin.full{background:#9a98b0}
+.pin.on{background:var(--night)}
+.leaflet-container{font-family:var(--body)}
+
+/* Proposer */
+dialog{border:0;padding:0;width:min(560px,calc(100% - 24px));max-height:90vh;border-radius:20px;background:var(--surface);color:var(--ink);box-shadow:0 30px 80px rgba(10,8,30,.45)}
+dialog::backdrop{background:rgba(15,12,40,.55)}
+.d-top{background:linear-gradient(120deg,#43306a,#b4486c 60%,#f08a4b);color:#fff;padding:20px 22px;display:flex;justify-content:space-between;align-items:start;gap:12px}
+.d-top h2{font-size:2rem}
+.d-top p{opacity:.9;font-size:.95rem;margin-top:4px}
+.x{border:0;background:rgba(255,255,255,.2);color:#fff;border-radius:50%;width:36px;height:36px;font-size:1.2rem;line-height:1;flex:none}
+form{padding:20px 22px 22px;display:grid;gap:14px}
+.field{display:grid;gap:5px}
+.field label{font-weight:700;font-size:.92rem}
+.field input,.field select,.field textarea{width:100%;background:var(--bg);border:1.5px solid var(--line);border-radius:10px;padding:10px 12px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.checks{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:.95rem}
+.checks label{display:inline-flex;gap:6px;align-items:center;font-weight:400}
+.checks input{width:auto;padding:0;accent-color:var(--apricot)}
+.note{font-size:.85rem;color:var(--muted)}
+.ok{display:grid;gap:10px;padding:26px 22px;text-align:center;justify-items:center}
+.ok h3{font-size:1.8rem}
+
+@media (max-width:900px){
+  .sky .wrap{grid-template-columns:minmax(0,1fr)}
+  .clock{justify-self:start}
+  .main{grid-template-columns:minmax(0,1fr)}
+  .view{display:flex}
+  .main[data-view="liste"] .mapbox{display:none}
+  .main[data-view="carte"] .list,.main[data-view="carte"] .count{display:none}
+  .mapbox{position:relative;top:0;height:70vh}
+}
+@media (max-width:520px){.two{grid-template-columns:minmax(0,1fr)}.moon{width:48px;height:48px;right:20px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="proto">Maquette : les iftars affichés sont des exemples fictifs.</div>
+
+<header class="sky">
+  <div class="stars" aria-hidden="true"></div>
+  <div class="moon" aria-hidden="true"></div>
+  <div class="sun" aria-hidden="true"></div>
+  <div class="wrap">
+    <div>
+      <h1><span lang="ar">فطور للجميع</span>Un Ftor pour tous</h1>
+      <p class="lede">Trouvez un iftar près de chez vous pendant le Ramadan, ou proposez le vôtre. Repas partagés, distributions et tables ouvertes, signalés par celles et ceux qui les organisent.</p>
+    </div>
+    <div class="clock" aria-live="polite">
+      <small id="clock-where">Aujourd'hui à Paris</small>
+      <b id="clock-time">--:--</b>
+      <span id="clock-left">Coucher du soleil</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap tools">
+  <form class="where" id="where" role="search">
+    <input id="city" value="Paris" aria-label="Ville ou code postal" autocomplete="off">
+    <button type="submit">Chercher</button>
+  </form>
+  <div class="filters" role="group" aria-label="Filtres" id="filters"></div>
+  <button class="add" type="button" id="add"><b>+</b> Proposer un iftar</button>
+</div>
+
+<main class="wrap main" id="main" data-view="liste">
+  <div>
+    <div class="view" role="group" aria-label="Affichage">
+      <button type="button" data-view="liste" aria-pressed="true">Liste</button>
+      <button type="button" data-view="carte" aria-pressed="false">Carte</button>
+    </div>
+    <p class="count" id="count"></p>
+    <div class="list" id="list"></div>
+  </div>
+  <div class="mapbox"><div id="map"></div></div>
+</main>
+
+<dialog id="dlg" aria-labelledby="d-title"></dialog>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+/* Exemples fictifs : noms et chiffres inventés pour la maquette, placés dans de vrais quartiers. */
+const IFTARS = [
+  { id:"goutte-dor", t:"Iftar solidaire de la Goutte-d'Or", who:"Association de quartier", where:"Paris 18e", lat:48.8866, lon:2.3536,
+    kind:"place", days:"Tous les soirs", tonight:true, cap:80, left:32, tags:["Gratuit","Familles"] },
+  { id:"belleville", t:"Table ouverte de Belleville", who:"Mosquée du quartier", where:"Paris 20e", lat:48.8722, lon:2.3768,
+    kind:"place", days:"Tous les soirs", tonight:true, cap:120, left:54, tags:["Gratuit","Accessible en fauteuil"] },
+  { id:"gare-du-nord", t:"Repas à emporter, gare du Nord", who:"Maraude bénévole", where:"Paris 10e", lat:48.8809, lon:2.3553,
+    kind:"emporter", days:"Tous les soirs", tonight:true, cap:150, left:150, tags:["Gratuit","Sans inscription"] },
+  { id:"etudiants", t:"Ftor des étudiants", who:"Collectif d'étudiants", where:"Paris 13e", lat:48.8270, lon:2.3550,
+    kind:"place", days:"Vendredi et samedi", tonight:false, cap:40, left:12, tags:["Prix libre","Étudiants"] },
+  { id:"saint-denis", t:"Iftar des voisins", who:"Amicale de locataires", where:"Saint-Denis", lat:48.9362, lon:2.3574,
+    kind:"place", days:"Tous les soirs", tonight:true, cap:60, left:0, tags:["Gratuit","Familles"] },
+  { id:"montreuil", t:"Ftor des familles", who:"Centre social", where:"Montreuil", lat:48.8617, lon:2.4432,
+    kind:"place", days:"Mercredi et dimanche", tonight:false, cap:70, left:26, tags:["Gratuit","Familles","Accessible en fauteuil"] },
+  { id:"rencontre", t:"Iftar de la rencontre", who:"Collectif interreligieux", where:"Paris 11e", lat:48.8590, lon:2.3800,
+    kind:"place", days:"Samedi", tonight:false, cap:90, left:41, tags:["Gratuit","Ouvert à tous"] }
+];
+const FILTERS = [
+  ["tonight", "Ce soir", f => f.tonight],
+  ["place", "Repas sur place", f => f.kind === "place"],
+  ["emporter", "À emporter", f => f.kind === "emporter"],
+  ["libre", "Places libres", f => f.left > 0],
+  ["familles", "Familles", f => f.tags.includes("Familles")],
+  ["fauteuil", "Accessible en fauteuil", f => f.tags.includes("Accessible en fauteuil")]
+];
+const state = { on: new Set(), going: new Set(), sel: null };
+const esc = s => String(s).replace(/[&<>"]/g, m => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[m]));
+
+/* Heure du coucher du soleil (équation du lever du soleil, à quelques minutes près) */
+function sunset(date, lat, lon) {
+  const rad = Math.PI / 180, JD = date.getTime() / 86400000 + 2440587.5;
+  const Js = Math.round(JD - 2451545) - lon / 360;
+  const M = (357.5291 + 0.98560028 * Js) % 360;
+  const C = 1.9148 * Math.sin(M * rad) + 0.02 * Math.sin(2 * M * rad) + 0.0003 * Math.sin(3 * M * rad);
+  const L = (M + C + 180 + 102.9372) % 360;
+  const Jt = 2451545 + Js + 0.0053 * Math.sin(M * rad) - 0.0069 * Math.sin(2 * L * rad);
+  const sd = Math.sin(L * rad) * Math.sin(23.4397 * rad), cd = Math.cos(Math.asin(sd));
+  const cw = (Math.sin(-0.833 * rad) - Math.sin(lat * rad) * sd) / (Math.cos(lat * rad) * cd);
+  if (cw < -1 || cw > 1) return null;
+  const Jset = Jt + Math.acos(cw) / rad / 360;
+  return new Date((Jset - 2440587.5) * 86400000);
+}
+const hm = d => d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }).replace(":", " h ");
+function tick() {
+  const now = new Date(), s = sunset(now, 48.8566, 2.3522);
+  if (!s) return;
+  document.getElementById("clock-time").textContent = hm(s);
+  const min = Math.round((s - now) / 60000);
+  document.getElementById("clock-left").textContent = min > 0
+    ? `Coucher du soleil, l'heure du ftor : dans ${min >= 60 ? Math.floor(min / 60) + " h " + String(min % 60).padStart(2, "0") : min + " min"}`
+    : "Le soleil est couché : bon ftor !";
+}
+tick(); setInterval(tick, 30000);
+
+/* Filtres */
+const fEl = document.getElementById("filters");
+fEl.innerHTML = FILTERS.map(([k, l]) => `<button class="f" type="button" data-f="${k}" aria-pressed="false">${l}</button>`).join("");
+fEl.addEventListener("click", e => {
+  const b = e.target.closest("[data-f]"); if (!b) return;
+  state.on.has(b.dataset.f) ? state.on.delete(b.dataset.f) : state.on.add(b.dataset.f);
+  b.setAttribute("aria-pressed", String(state.on.has(b.dataset.f))); render();
+});
+const shown = () => IFTARS.filter(f => FILTERS.every(([k, , test]) => !state.on.has(k) || test(f)));
+
+/* Carte */
+let map = null; const markers = {};
+if (window.L) {
+  map = L.map("map", { scrollWheelZoom: false, zoomControl: true }).setView([48.872, 2.375], 12);
+  const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+  L.tileLayer(`https://{s}.basemaps.cartocdn.com/${dark ? "dark_all" : "rastertiles/voyager"}/{z}/{x}/{y}{r}.png`, {
+    maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+  }).addTo(map);
+} else {
+  document.getElementById("map").innerHTML = '<div class="nomap">La carte n\'a pas pu se charger. La liste reste disponible.</div>';
+}
+function pinIcon(f) {
+  return L.divIcon({ className: "", iconSize: [34, 34], iconAnchor: [17, 34], popupAnchor: [0, -30],
+    html: `<div class="pin${f.left === 0 ? " full" : ""}${state.sel === f.id ? " on" : ""}"><i></i></div>` });
+}
+
+/* Liste */
+function render() {
+  const l = shown();
+  document.getElementById("count").textContent = l.length + (l.length > 1 ? " iftars près de Paris" : " iftar près de Paris");
+  const ss = sunset(new Date(), 48.8566, 2.3522);
+  document.getElementById("list").innerHTML = l.length ? l.map(f => {
+    const pct = Math.round((f.left / f.cap) * 100), going = state.going.has(f.id);
+    return `<article class="card${state.sel === f.id ? " on" : ""}" id="c-${f.id}" data-id="${f.id}">
+      <div class="time"><b>${ss ? hm(ss).replace(" h ", ":") : "--"}</b><small>${f.kind === "emporter" ? "à emporter" : "sur place"}</small></div>
+      <h3>${esc(f.t)}<span class="ex">exemple</span></h3>
+      <p class="who">${esc(f.who)} · ${esc(f.where)} · ${esc(f.days)}</p>
+      <div class="tags">${f.tags.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</div>
+      <div class="seats">
+        <span class="bar" aria-hidden="true"><i style="width:${pct}%"></i></span>
+        <small class="${f.left === 0 ? "full" : ""}">${f.left === 0 ? "Complet" : f.kind === "emporter" ? f.left + " repas prévus" : f.left + " places sur " + f.cap}</small>
+        <button class="go" type="button" data-go="${f.id}" aria-pressed="${going}" ${f.left === 0 && !going ? "disabled" : ""}>${going ? "Je viens ✓" : f.kind === "emporter" ? "J'y passe" : "Je viens"}</button>
+      </div>
+    </article>`;
+  }).join("") : '<p class="note">Aucun iftar ne correspond à ces filtres. Retirez-en un, ou proposez le vôtre.</p>';
+  if (map) {
+    Object.values(markers).forEach(m => m.remove());
+    l.forEach(f => {
+      markers[f.id] = L.marker([f.lat, f.lon], { icon: pinIcon(f), title: f.t }).addTo(map)
+        .bindPopup(`<b>${esc(f.t)}</b><br>${esc(f.where)} · ${f.left === 0 ? "complet" : f.left + " places"}`)
+        .on("click", () => select(f.id, true));
+    });
+  }
+}
+function select(id, fromMap) {
+  state.sel = id; render();
+  const card = document.getElementById("c-" + id);
+  if (fromMap && card) {
+    document.getElementById("main").dataset.view = "liste"; syncView();
+    card.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
+  } else if (map) {
+    const f = IFTARS.find(x => x.id === id); map.panTo([f.lat, f.lon]); markers[id] && markers[id].openPopup();
+  }
+}
+document.getElementById("list").addEventListener("click", e => {
+  const g = e.target.closest("[data-go]");
+  if (g) {
+    const f = IFTARS.find(x => x.id === g.dataset.go);
+    if (state.going.has(f.id)) { state.going.delete(f.id); f.left++; } else if (f.left > 0) { state.going.add(f.id); f.left--; }
+    render(); return;
+  }
+  const c = e.target.closest("[data-id]"); if (c) select(c.dataset.id, false);
+});
+
+/* Liste / carte sur téléphone */
+const main = document.getElementById("main");
+function syncView() { main.querySelectorAll("[data-view]").forEach(b => { if (b.tagName === "BUTTON") b.setAttribute("aria-pressed", String(b.dataset.view === main.dataset.view)); }); if (map) setTimeout(() => map.invalidateSize(), 50); }
+main.querySelector(".view").addEventListener("click", e => { const b = e.target.closest("[data-view]"); if (!b) return; main.dataset.view = b.dataset.view; syncView(); });
+
+/* Ville (maquette : seuls des exemples autour de Paris) */
+document.getElementById("where").addEventListener("submit", e => {
+  e.preventDefault();
+  const v = document.getElementById("city").value.trim();
+  document.getElementById("count").textContent = v && !/paris|75|93|saint-denis|montreuil/i.test(v)
+    ? `Dans la maquette, seuls des exemples autour de Paris sont affichés. Le vrai site cherchera autour de « ${v} ».`
+    : document.getElementById("count").textContent;
+});
+
+/* Proposer un iftar */
+const dlg = document.getElementById("dlg");
+function openForm() {
+  dlg.innerHTML = `
+    <div class="d-top"><div><h2 id="d-title">Proposer un iftar</h2><p>Chaque proposition est relue avant d'apparaître sur la carte.</p></div>
+      <button class="x" type="button" data-close aria-label="Fermer">×</button></div>
+    <form id="pf">
+      <div class="field"><label for="p-name">Nom de l'iftar</label><input id="p-name" required placeholder="Ex. Iftar de la rue des Lilas"></div>
+      <div class="two">
+        <div class="field"><label for="p-who">Organisé par</label><input id="p-who" required placeholder="Association, mosquée, voisins…"></div>
+        <div class="field"><label for="p-addr">Adresse</label><input id="p-addr" required placeholder="Numéro, rue, ville"></div>
+      </div>
+      <div class="two">
+        <div class="field"><label for="p-kind">Type</label><select id="p-kind"><option>Repas sur place</option><option>À emporter</option><option>Les deux</option></select></div>
+        <div class="field"><label for="p-cap">Nombre de places</label><input id="p-cap" type="number" min="1" inputmode="numeric" placeholder="Ex. 60"></div>
+      </div>
+      <div class="field"><label for="p-days">Quels soirs ?</label><input id="p-days" placeholder="Tous les soirs, les week-ends, le 15 mars…"></div>
+      <div class="field"><span style="font-weight:700;font-size:.92rem">Bon à savoir</span>
+        <div class="checks"><label><input type="checkbox"> Gratuit</label><label><input type="checkbox"> Familles bienvenues</label><label><input type="checkbox"> Accessible en fauteuil</label><label><input type="checkbox"> Sans inscription</label></div></div>
+      <div class="field"><label for="p-contact">Contact pour l'équipe de relecture</label><input id="p-contact" placeholder="Mail ou téléphone, jamais publié"></div>
+      <button class="add" type="submit" style="justify-self:start">Envoyer la proposition</button>
+      <p class="note">Maquette : rien n'est envoyé ni enregistré.</p>
+    </form>`;
+  dlg.showModal();
+}
+document.getElementById("add").addEventListener("click", openForm);
+dlg.addEventListener("click", e => { if (e.target === dlg || e.target.closest("[data-close]")) dlg.close(); });
+dlg.addEventListener("submit", e => {
+  e.preventDefault();
+  dlg.querySelector("form").outerHTML = `<div class="ok"><h3>Merci !</h3><p>Dans le vrai site, votre iftar serait relu par l'équipe puis ajouté à la carte.</p><button class="add" type="button" data-close>Fermer</button></div>`;
+});
+
+render();
+</script>
+</body>
+</html>
